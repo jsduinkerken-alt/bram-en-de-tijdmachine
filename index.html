@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Brams Klokspel">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Bram en de Tijdmachine</title>
+<style>
+:root{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#26334c;background:#f2f8ff}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#f2f8ff}
+body{min-height:100dvh;display:flex;justify-content:center;padding:10px}
+button{font:inherit;border:0;background:white;border-radius:16px;padding:12px 14px;box-shadow:0 3px 0 #d4deef;cursor:pointer;color:#253450;font-weight:700;touch-action:manipulation}
+button.selected{background:#405dd5;color:white;box-shadow:0 3px 0 #243c98}
+button:focus-visible{outline:3px solid #ffb441}
+.app{width:min(100%,1180px);display:grid;gap:10px}
+.tag{color:#62718b;font-size:.78rem;text-align:center}
+h1{font-size:clamp(1.55rem,4vw,2.2rem);margin:4px 0 0;text-align:center}
+.intro{margin:0;text-align:center;color:#536581}
+nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.panel{background:white;border-radius:27px;padding:12px 12px 16px;box-shadow:0 10px 28px #b9cbe25b;display:flex;flex-direction:column;align-items:center}
+.prompt{font-size:clamp(1.1rem,3vw,1.45rem);font-weight:800;min-height:34px;margin:0 0 4px;text-align:center}
+.hint{font-size:.95rem;color:#687790;min-height:22px;text-align:center}
+.clockwrap{width:min(100%,430px);margin:0 auto;touch-action:none;user-select:none;-webkit-user-select:none}
+.clockwrap svg{width:100%;height:auto;display:block;overflow:visible}
+.answers{display:flex;justify-content:center;gap:9px;flex-wrap:wrap;margin:10px 0}
+.answers button{min-width:120px}
+.feedback{font-weight:800;min-height:34px;font-size:1.08rem;color:#147b57;text-align:center}
+.feedback.bad{color:#be5c2f}
+.bottom{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;align-items:center;width:100%;margin-top:8px}
+.primary{background:#ffbc28;color:#392600;box-shadow:0 6px 0 #db8d00}
+.muted{background:#3f62dc;color:white;box-shadow:0 6px 0 #263e9c}
+.bottom button{font-size:clamp(1.1rem,3vw,1.4rem);min-height:64px;min-width:190px;padding:14px 24px;border-radius:20px;transition:transform .12s,filter .12s}
+.bottom button:active{transform:translateY(4px);filter:brightness(.96);box-shadow:0 2px 0 #778}
+.score{font-weight:800;color:#6a5d13;white-space:nowrap;font-size:1.1rem}
+.foot{font-size:.84rem;color:#697993;text-align:center;margin:0}
+.hidden{display:none}
+.spark{animation:pop .36s ease-out}
+@keyframes pop{from{transform:scale(.96)}50%{transform:scale(1.025)}to{transform:scale(1)}}
+@media (min-width: 860px){
+ html,body{height:100%;overflow:hidden}
+ body{padding:8px;align-items:center}
+ .app{height:min(100%,860px);grid-template-columns:minmax(210px,250px) minmax(0,1fr);grid-template-rows:auto auto auto auto auto auto minmax(0,1fr)}
+ .tag{grid-column:1;grid-row:1;text-align:left}
+ h1{grid-column:1;grid-row:2;text-align:left;font-size:clamp(1.2rem,2vw,1.75rem);line-height:1.12;margin:0}
+ .intro{grid-column:1;grid-row:3;text-align:left;font-size:.86rem}
+ nav{grid-column:1;justify-content:stretch;align-content:start;flex-direction:column;margin:0;gap:6px}
+ nav[data-kind="play"]{grid-row:4}
+ nav[data-kind="mode"]{grid-row:5}
+ nav[data-kind="level"]{grid-row:6}
+ nav button{text-align:left;padding:10px 10px;font-size:.92rem}
+ .panel{grid-column:2;grid-row:1/8;min-height:0;justify-content:center;padding:10px 16px}
+ .clockwrap{width:min(100%,min(48dvh,500px))}
+ .foot{display:none}
+ .bottom{flex-wrap:nowrap;gap:10px}
+ .bottom button{min-width:0;flex:1;padding:10px 8px;min-height:52px;font-size:clamp(.95rem,1.5vw,1.15rem)}
+ .feedback{min-height:24px;font-size:1rem}
+ .prompt{font-size:clamp(1.02rem,1.9vw,1.35rem);min-height:0}
+ .hint{font-size:.84rem;min-height:0}
+}
+@media (max-width: 859px){
+ .clockwrap{width:min(100%,320px)}
+ .bottom button{flex:1 1 100%;width:100%}
+}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="tag">⭐ SMALL SPARK STUDIO ⭐</div>
+  <h1>⏰ Bram en de Tijdmachine</h1>
+  <p class="intro">Een vrolijk spel om te leren klokkijken!</p>
+
+  <nav class="modes" data-kind="play" aria-label="Kies speelwijze">
+    <button data-play="together">👨‍👦 Samen</button>
+    <button data-play="solo">🔊 Zelf spelen</button>
+    <button id="speak" aria-label="Lees opdracht voor">🔈 Luister</button>
+  </nav>
+
+  <nav class="modes" data-kind="mode" aria-label="Kies een spel">
+    <button data-mode="discover">🔎 Ontdekken</button>
+    <button data-mode="set">👆 Zet de klok</button>
+    <button data-mode="read">🎯 Hoe laat?</button>
+  </nav>
+
+  <nav class="levels" data-kind="level" aria-label="Kies moeilijkheid">
+    <button data-level="whole">Hele uren</button>
+    <button data-level="half">Halve uren</button>
+  </nav>
+
+  <section class="panel" id="panel">
+    <div class="prompt" id="prompt"></div>
+    <div class="clockwrap">
+      <svg id="clock" viewBox="0 0 400 400" role="img" aria-label="Analoge klok met twee draaibare wijzers">
+        <circle cx="200" cy="200" r="183" fill="#dceaff"/>
+        <circle cx="200" cy="200" r="168" fill="#fffdf7" stroke="#94ade4" stroke-width="5"/>
+        <g id="ticks"></g>
+        <g id="numbers"></g>
+        <line id="minuteHand" x1="200" y1="214" x2="200" y2="60" stroke="#f59f33" stroke-width="11" stroke-linecap="round"/>
+        <line id="hourHand" x1="200" y1="210" x2="200" y2="110" stroke="#3a62c9" stroke-width="17" stroke-linecap="round"/>
+        <circle id="minuteHit" cx="200" cy="60" r="28" fill="transparent"/>
+        <circle id="hourHit" cx="200" cy="110" r="30" fill="transparent"/>
+        <circle id="minuteHandle" cx="200" cy="60" r="16" fill="#ff8d1f" stroke="#d56600" stroke-width="4"/>
+        <circle id="hourHandle" cx="200" cy="110" r="18" fill="#2c7cf0" stroke="#0d4db3" stroke-width="4"/>
+        <circle cx="200" cy="200" r="14" fill="#263f8e"/>
+      </svg>
+    </div>
+    <div class="hint" id="hint"></div>
+    <div class="answers" id="answers"></div>
+    <div id="feedback" class="feedback" aria-live="polite"></div>
+    <div class="bottom">
+      <button class="primary" id="check">✅ Controleer</button>
+      <button class="muted" id="next">➡️ Volgende</button>
+      <span class="score" id="score">⭐ 0</span>
+    </div>
+  </section>
+
+  <p class="foot">Tip: je kunt nu beide wijzers soepel verplaatsen. De grote wijzer mag overal staan en de kleine wijzer beweegt direct mee — en andersom ook.</p>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const names = ['twaalf','één','twee','drie','vier','vijf','zes','zeven','acht','negen','tien','elf'];
+let play='together', mode='discover', level='whole';
+let totalMinutes=180; // 0..719
+let goalHour=3, goalMinute=0, stars=0, done=false;
+let activeHand=null;
+const svg=$('clock');
+let audioCtx=null;
+
+for(let i=0;i<60;i++){
+  const a=i*Math.PI/30;
+  const r1=i%5===0?151:158, r2=165;
+  const el=document.createElementNS('http://www.w3.org/2000/svg','line');
+  el.setAttribute('x1',200+Math.sin(a)*r1);
+  el.setAttribute('y1',200-Math.cos(a)*r1);
+  el.setAttribute('x2',200+Math.sin(a)*r2);
+  el.setAttribute('y2',200-Math.cos(a)*r2);
+  el.setAttribute('stroke',i%5===0?'#5275b6':'#bbc9df');
+  el.setAttribute('stroke-width',i%5===0?4:2);
+  $('ticks').append(el);
+}
+for(let i=1;i<=12;i++){
+  const a=i*Math.PI/6;
+  const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+  t.setAttribute('x',200+Math.sin(a)*133);
+  t.setAttribute('y',200-Math.cos(a)*133+10);
+  t.setAttribute('font-size','28');
+  t.setAttribute('font-weight','800');
+  t.setAttribute('text-anchor','middle');
+  t.setAttribute('fill','#3f5886');
+  t.textContent=i;
+  $('numbers').append(t);
+}
+
+function mod(n,m){ return ((n%m)+m)%m; }
+function currentHour(){ return Math.floor(totalMinutes/60)%12 || 12; }
+function currentMinute(){ return Math.round(mod(totalMinutes,60)); }
+function digitalText(h,m){ return `${h}:${String(m).padStart(2,'0')}`; }
+function phrase(h,m){
+  if(m===0) return `${names[h%12]} uur`;
+  if(m===30) return `half ${names[(h+1)%12]}`;
+  return digitalText(h,m);
+}
+function displayTime(){ return phrase(currentHour(), currentMinute()); }
+function moveLine(id,deg,len,y1){
+  const a=deg*Math.PI/180;
+  $(id).setAttribute('x1',200);
+  $(id).setAttribute('y1',y1);
+  $(id).setAttribute('x2',200+Math.sin(a)*len);
+  $(id).setAttribute('y2',200-Math.cos(a)*len);
+}
+function moveCircle(id,deg,len){
+  const a=deg*Math.PI/180;
+  $(id).setAttribute('cx',200+Math.sin(a)*len);
+  $(id).setAttribute('cy',200-Math.cos(a)*len);
+}
+function draw(){
+  const minAngle = mod(totalMinutes*6,360);
+  const hourAngle = mod(totalMinutes*0.5,360);
+  moveLine('minuteHand',minAngle,140,214);
+  moveLine('hourHand',hourAngle,92,210);
+  moveCircle('minuteHandle',minAngle,140);
+  moveCircle('minuteHit',minAngle,140);
+  moveCircle('hourHandle',hourAngle,92);
+  moveCircle('hourHit',hourAngle,92);
+}
+function selection(){
+  document.querySelectorAll('[data-play]').forEach(b=>b.classList.toggle('selected',b.dataset.play===play));
+  document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));
+  document.querySelectorAll('[data-level]').forEach(b=>b.classList.toggle('selected',b.dataset.level===level));
+}
+function randomTime(){
+  const h=1+Math.floor(Math.random()*12);
+  const m=level==='whole' ? 0 : (Math.random()<0.5 ? 0 : 30);
+  return [h,m];
+}
+function setTime(h,m){ totalMinutes = mod((h%12)*60 + m, 720); draw(); }
+function updateDiscoverPrompt(){ $('prompt').textContent = `Het is ${displayTime()}!`; }
+function setup(){
+  done=false;
+  $('feedback').textContent='';
+  $('feedback').classList.remove('bad');
+  $('answers').innerHTML='';
+  $('check').classList.toggle('hidden', mode!=='set');
+  $('next').textContent = mode==='discover' ? '🎲 Verrassing' : '➡️ Volgende';
+
+  if(mode==='discover'){
+    const [h,m]=randomTime();
+    setTime(h,m);
+    updateDiscoverPrompt();
+    $('hint').textContent='Sleep de blauwe kleine of de oranje grote wijzer.';
+  } else if(mode==='set'){
+    [goalHour,goalMinute]=randomTime();
+    setTime(12,0);
+    $('prompt').textContent=`Maak: ${phrase(goalHour,goalMinute)}!`;
+    $('hint').textContent='Je mag beide wijzers gebruiken. Ze reageren direct op elkaar.';
+  } else {
+    const [h,m]=randomTime();
+    setTime(h,m);
+    $('prompt').textContent='Hoe laat is het?';
+    $('hint').textContent='Tik op het juiste antwoord.';
+    const correct=phrase(h,m);
+    const choices=new Set([correct]);
+    while(choices.size<3){
+      const [rh,rm]=randomTime();
+      choices.add(phrase(rh,rm));
+    }
+    Array.from(choices).sort(()=>Math.random()-.5).forEach(v=>{
+      const b=document.createElement('button');
+      b.textContent=v;
+      b.onclick=()=>answer(v);
+      $('answers').append(b);
+    });
+  }
+  selection();
+  if(play==='solo') speakPrompt();
+}
+function playSuccessSound(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    const now=audioCtx.currentTime;
+    const notes=[523.25,659.25,783.99,1046.5];
+    notes.forEach((freq,i)=>{
+      const osc=audioCtx.createOscillator();
+      const gain=audioCtx.createGain();
+      osc.type='sine';
+      osc.frequency.value=freq;
+      gain.gain.setValueAtTime(0.0001,now+i*0.11);
+      gain.gain.exponentialRampToValueAtTime(0.18,now+i*0.11+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001,now+i*0.11+0.20);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(now+i*0.11);
+      osc.stop(now+i*0.11+0.22);
+    });
+  }catch(e){}
+}
+function celebrate(){
+  if(done) return;
+  done=true;
+  stars++;
+  $('score').textContent=`⭐ ${stars}`;
+  $('feedback').classList.remove('bad');
+  $('feedback').textContent=['🌟 Supergoed, Bram!','🎉 Hoera! Helemaal goed!','🚂 Goed gedaan!'][Math.floor(Math.random()*3)];
+  $('panel').classList.remove('spark'); void $('panel').offsetWidth; $('panel').classList.add('spark');
+  playSuccessSound();
+}
+function answer(v){
+  if(done) return;
+  if(v===phrase(currentHour(), currentMinute())) celebrate();
+  else { $('feedback').textContent='Bijna! Probeer het nog eens 😊'; $('feedback').classList.add('bad'); }
+}
+function isCorrect(){
+  const target=(goalHour%12)*60 + goalMinute;
+  let diff=Math.abs(target-totalMinutes);
+  diff=Math.min(diff,720-diff);
+  return diff<=4; // een beetje speelruimte
+}
+$('check').onclick=()=>{
+  if(done) return;
+  if(isCorrect()) celebrate();
+  else { $('feedback').textContent='Nog niet helemaal. Kijk goed naar de wijzers! 💛'; $('feedback').classList.add('bad'); }
+};
+$('next').onclick=setup;
+document.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>{ play=b.dataset.play; selection(); if(play==='solo') speakPrompt(); });
+$('speak').onclick=speakPrompt;
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{ mode=b.dataset.mode; setup(); });
+document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>{ level=b.dataset.level; setup(); });
+function speakPrompt(){
+  if(!('speechSynthesis' in window)) { $('feedback').textContent='Deze browser kan helaas niet voorlezen.'; return; }
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance($('prompt').textContent);
+  u.lang='nl-NL'; u.rate=.82; u.pitch=1.08;
+  speechSynthesis.speak(u);
+}
+function pointOnClock(e){
+  const r=svg.getBoundingClientRect();
+  return {x:(e.clientX-r.left)*400/r.width-200, y:(e.clientY-r.top)*400/r.height-200};
+}
+function angleFromPoint(x,y){ return mod(Math.atan2(x,-y)*180/Math.PI,360); }
+function handCenter(which){
+  const angle = which==='minute' ? mod(totalMinutes*6,360) : mod(totalMinutes*0.5,360);
+  const len = which==='minute' ? 140 : 92;
+  return {x:200+Math.sin(angle*Math.PI/180)*len, y:200-Math.cos(angle*Math.PI/180)*len};
+}
+function nearestHand(x,y){
+  const m=handCenter('minute');
+  const h=handCenter('hour');
+  const dm=Math.hypot((x+200)-m.x,(y+200)-m.y);
+  const dh=Math.hypot((x+200)-h.x,(y+200)-h.y);
+  if(dm<dh) return 'minute';
+  return 'hour';
+}
+function setTimeFromMinuteAngle(angle){
+  const minuteValue=angle/6; // 0..60
+  const baseHour=Math.floor(totalMinutes/60);
+  let best=totalMinutes;
+  let bestDiff=Infinity;
+  for(let h=baseHour-1; h<=baseHour+1; h++){
+    const cand=h*60+minuteValue;
+    let diff=Math.abs(cand-totalMinutes);
+    if(diff<bestDiff){ best=cand; bestDiff=diff; }
+  }
+  totalMinutes=mod(best,720);
+}
+function setTimeFromHourAngle(angle){
+  let candidate=angle/0.5; // 0..720
+  const options=[candidate, candidate+720, candidate-720];
+  let best=totalMinutes, bestDiff=Infinity;
+  options.forEach(c=>{ const diff=Math.abs(c-totalMinutes); if(diff<bestDiff){ best=c; bestDiff=diff; } });
+  totalMinutes=mod(best,720);
+}
+function updateActive(e){
+  if(!activeHand) return;
+  const {x,y}=pointOnClock(e);
+  const angle=angleFromPoint(x,y);
+  if(activeHand==='minute') setTimeFromMinuteAngle(angle);
+  else setTimeFromHourAngle(angle);
+  draw();
+  if(mode==='discover') updateDiscoverPrompt();
+}
+svg.addEventListener('pointerdown',e=>{
+  if(mode==='read' || done) return;
+  const {x,y}=pointOnClock(e);
+  activeHand=nearestHand(x,y);
+  svg.setPointerCapture(e.pointerId);
+  updateActive(e);
+});
+svg.addEventListener('pointermove',e=>{ if(activeHand) updateActive(e); });
+function endDrag(){ activeHand=null; }
+svg.addEventListener('pointerup',endDrag);
+svg.addEventListener('pointercancel',endDrag);
+
+draw();
+setup();
+</script>
+</body>
+</html>

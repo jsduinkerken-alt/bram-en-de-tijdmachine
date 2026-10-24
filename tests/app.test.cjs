@@ -185,3 +185,71 @@ test('spraak gebruikt natuurlijk Nederlands zonder dubbele tijdnotatie', () => {
   a.run('mode="read"; speakPrompt()');
   assert.equal(spoken.text,'Hoe laat is het?');
 });
+
+test('alle 720 minuutposities hebben juiste Nederlandse tekst en één tijdpaar', () => {
+  const a=app();
+  const hours=['twaalf','één','twee','drie','vier','vijf','zes','zeven','acht','negen','tien','elf'];
+  // Onafhankelijke volledige minutentabel: H is huidig uur, N het volgende uur.
+  const expected=[
+    'H uur','één over H','twee over H','drie over H','vier over H','vijf over H',
+    'zes over H','zeven over H','acht over H','negen over H','tien over H',
+    'elf over H','twaalf over H','dertien over H','veertien over H','kwart over H',
+    'zestien over H','zeventien over H','achttien over H','negentien over H',
+    'tien voor half N','negen voor half N','acht voor half N','zeven voor half N',
+    'zes voor half N','vijf voor half N','vier voor half N','drie voor half N',
+    'twee voor half N','één voor half N','half N','één over half N',
+    'twee over half N','drie over half N','vier over half N','vijf over half N',
+    'zes over half N','zeven over half N','acht over half N','negen over half N',
+    'tien over half N','negentien voor N','achttien voor N','zeventien voor N',
+    'zestien voor N','kwart voor N','veertien voor N','dertien voor N',
+    'twaalf voor N','elf voor N','tien voor N','negen voor N','acht voor N',
+    'zeven voor N','zes voor N','vijf voor N','vier voor N','drie voor N','twee voor N','één voor N'
+  ];
+  assert.equal(expected.length,60);
+  for(let h=1;h<=12;h++) for(let m=0;m<60;m++) {
+    const words=expected[m].replace('H',hours[h%12]).replace('N',hours[(h+1)%12]);
+    const digital=`${h}:${String(m).padStart(2,'0')}`;
+    const text=`${digital} (${words})`;
+    assert.equal(a.run(`phrase(${h},${m})`),words,`${h}:${m}`);
+    assert.equal(a.run(`timeText(${h},${m})`),text);
+    a.run(`setTime(${h},${m}); globalThis.sample=document.createElement('div'); renderTime(sample,${h},${m})`);
+    assert.equal(a.run('currentHour()'),h);
+    assert.equal(a.run('currentMinute()'),m);
+    assert.equal(a.run('sample.children.length'),4);
+    assert.equal(a.run('sample.children.map(c=>c.textContent).join("")'),text);
+    a.run('mode="discover"; updateDiscoverPrompt()');
+    assert.equal(a.document.getElementById('prompt').children.slice(-4).map(c=>c.textContent).join(''),`Het is ${text}!`);
+  }
+});
+
+test('expliciete afstand en reduced-motion blijven aanwezig', () => {
+  assert.match(html,/\.time-written\{[^}]*margin-inline-start:\.35em/);
+  assert.match(html,/@media\(prefers-reduced-motion:reduce\)\{\.balloon\{animation:none;bottom:35%\}\}/);
+  assert.match(html,/\.time-digital\{font-size:1\.2em;font-weight:850\}/);
+});
+
+test('halfuurconstructies worden ook natuurlijk uitgesproken rond twaalf', () => {
+  let spoken;
+  const a=app({speechSynthesis:{cancel(){},speak(u){spoken=u;}}});
+  for(const [m,words] of [[19,'negentien over twaalf'],[20,'tien voor half één'],[25,'vijf voor half één'],[29,'één voor half één'],[30,'half één'],[31,'één over half één'],[35,'vijf over half één'],[40,'tien over half één'],[41,'negentien voor één']]) {
+    a.run(`mode='discover'; setTime(12,${m}); speakPrompt()`);
+    assert.equal(spoken.text,`Het is ${words}!`);
+  }
+});
+
+test('alle modi en niveaus gebruiken hetzelfde digitale en geschreven tijdpaar', () => {
+  const a=app();
+  for(const level of ['whole','half']) for(const mode of ['discover','set','read']) {
+    a.run(`level='${level}'; mode='${mode}'; setup()`);
+    if(mode==='read') {
+      assert.equal(a.document.getElementById('prompt').textContent,'Hoe laat is het?');
+      for(const button of a.document.getElementById('answers').children.slice(-3)) {
+        const [h,m]=button.children[1].textContent.split(':').map(Number);
+        assert.equal(button.children.map(c=>c.textContent).join(''),a.run(`timeText(${h},${m})`));
+      }
+    } else {
+      const expected=mode==='set' ? a.run('"Maak: "+timeText(goalHour,goalMinute)+"!"') : a.run('"Het is "+timeText(currentHour(),currentMinute())+"!"');
+      assert.equal(a.document.getElementById('prompt').children.slice(-4).map(c=>c.textContent).join(''),expected);
+    }
+  }
+});

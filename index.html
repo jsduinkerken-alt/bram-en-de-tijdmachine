@@ -39,7 +39,7 @@ nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .foot{font-size:.84rem;color:#697993;text-align:center;margin:0}
 .hidden{display:none}
 .time-digital{font-size:1.2em;font-weight:850}
-.time-written{font-size:.78em;font-weight:500;display:inline-block}
+.time-written{font-size:.78em;font-weight:500;display:inline-block;margin-inline-start:.35em}
 .party{position:fixed;inset:0;z-index:10;pointer-events:none;overflow:hidden}
 .party[hidden]{display:none}
 .party button{position:absolute;top:16px;right:16px;pointer-events:auto}
@@ -175,8 +175,12 @@ function phrase(h,m){
   if(m===30) return `half ${names[(h+1)%12]}`;
   if(m===15) return `kwart over ${names[h%12]}`;
   if(m===45) return `kwart voor ${names[(h+1)%12]}`;
-  const number=n=>n<=12 ? names[n%12] : n<20 ? ['dertien','veertien','vijftien','zestien','zeventien','achttien','negentien'][n-13] : n===20 ? 'twintig' : `${names[n-20]}entwintig`;
-  return m<30 ? `${number(m)} over ${names[h%12]}` : `${number(60-m)} voor ${names[(h+1)%12]}`;
+  if(m>=20 && m<30) return `${phraseNumber(30-m)} voor half ${names[(h+1)%12]}`;
+  if(m>30 && m<=40) return `${phraseNumber(m-30)} over half ${names[(h+1)%12]}`;
+  return m<30 ? `${phraseNumber(m)} over ${names[h%12]}` : `${phraseNumber(60-m)} voor ${names[(h+1)%12]}`;
+}
+function phraseNumber(n){
+  return n<=12 ? names[n%12] : ['dertien','veertien','vijftien','zestien','zeventien','achttien','negentien'][n-13];
 }
 function timeValue(h,m){ return mod(h*60+m,720); }
 function timeText(h,m){ return `${digitalText(h,m)} (${phrase(h,m)})`; }

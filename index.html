@@ -16,6 +16,8 @@ button.selected{background:#405dd5;color:white;box-shadow:0 3px 0 #243c98}
 button:focus-visible{outline:3px solid #ffb441}
 .app{width:min(100%,1180px);display:grid;gap:10px}
 .tag{color:#62718b;font-size:.78rem;text-align:center}
+.parent-tools{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
+.parent-tools button{font-size:.75rem;padding:8px;box-shadow:0 2px 0 #d4deef}
 h1{font-size:clamp(1.55rem,4vw,2.2rem);margin:4px 0 0;text-align:center}
 .intro{margin:0;text-align:center;color:#536581}
 nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
@@ -67,7 +69,7 @@ nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 </head>
 <body>
 <main class="app">
-  <div class="tag">⭐ SMALL SPARK STUDIO ⭐</div>
+  <div class="tag">⭐ SMALL SPARK STUDIO ⭐ <span class="parent-tools"><span id="app-version"></span><button id="refresh-app" type="button" aria-label="Vernieuwen voor ouders">Vernieuwen</button></span></div>
   <h1>⏰ Bram en de Tijdmachine</h1>
   <p class="intro">Een vrolijk spel om te leren klokkijken!</p>
 
@@ -355,5 +357,6 @@ svg.addEventListener('pointercancel',endDrag);
 draw();
 setup();
 </script>
+<script src="src/version.js"></script>
 </body>
 </html>

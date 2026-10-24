@@ -1,0 +1,101 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+const root = path.join(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+
+function app() {
+  const elements = new Map();
+  function element() {
+    return { textContent: '', innerHTML: '', children: [], dataset: {},
+      classList: { toggle() {}, add() {}, remove() {} },
+      setAttribute() {}, addEventListener() {}, append(child) { this.children.push(child); } };
+  }
+  const document = {
+    getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); },
+    querySelectorAll() { return []; }, createElement: element, createElementNS: element
+  };
+  const context = vm.createContext({ document, window: {}, console });
+  vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
+  return { run: code => vm.runInContext(code, context), document };
+}
+
+test('wijzerconversie behoudt koppeling en minuten', () => {
+  const a = app();
+  a.run('setTime(3,0); for(let angle=6; angle<=180; angle+=6) setTimeFromMinuteAngle(angle)');
+  assert.equal(a.run('totalMinutes'), 210);
+  a.run('setTimeFromHourAngle(105)');
+  assert.equal(a.run('totalMinutes'), 210);
+  assert.equal(a.run('currentHour()'), 3);
+  assert.equal(a.run('currentMinute()'), 30);
+});
+test('hele en halve uren in alle twaalf uren', () => {
+  const a = app();
+  for (let h = 1; h <= 12; h++) for (const m of [0, 30]) {
+    a.run(`setTime(${h},${m}); goalHour=${h}; goalMinute=${m}`);
+    assert.equal(a.run('isCorrect()'), true);
+    assert.equal(a.run('currentHour()'), h);
+    assert.equal(a.run('currentMinute()'), m);
+    a.run('totalMinutes=mod(totalMinutes+10,720)');
+    assert.equal(a.run('isCorrect()'), false);
+  }
+  assert.equal(a.run('phrase(12,30)'), 'half één');
+  assert.equal(a.run('phrase(12,0)'), 'twaalf uur');
+});
+test('beide wijzers draaien vooruit en achteruit over twaalf', () => {
+  const a = app();
+  a.run('setTime(11,59); setTimeFromMinuteAngle(6)');
+  assert.equal(a.run('totalMinutes'), 1);
+  a.run('setTimeFromMinuteAngle(354)');
+  assert.equal(a.run('totalMinutes'), 719);
+  a.run('setTimeFromHourAngle(0.5)');
+  assert.equal(a.run('totalMinutes'), 1);
+  a.run('setTimeFromHourAngle(359.5)');
+  assert.equal(a.run('totalMinutes'), 719);
+});
+test('spelmodi, speelwijzen, antwoorden en sterren', () => {
+  const a = app();
+  for (const play of ['together', 'solo']) for (const level of ['whole', 'half']) {
+    for (const mode of ['discover', 'set', 'read']) {
+      a.run(`play='${play}'; level='${level}'; mode='${mode}'; setup()`);
+      assert.ok(a.document.getElementById('prompt').textContent);
+      assert.ok([0, 30].includes(a.run('currentMinute()')));
+      if (mode === 'set') {
+        a.run('setTime(goalHour,goalMinute)');
+        a.document.getElementById('check').onclick();
+        assert.equal(a.run('done'), true);
+      }
+      if (mode === 'read') {
+        a.run('answer("onjuist")');
+        assert.equal(a.run('done'), false);
+        a.run('answer(phrase(currentHour(),currentMinute()))');
+        assert.equal(a.run('done'), true);
+        const stars = a.run('stars');
+        a.run('answer(phrase(currentHour(),currentMinute()))');
+        assert.equal(a.run('stars'), stars);
+      }
+    }
+  }
+});
+test('centrale versie en veilig vernieuwen met behoud van URL', () => {
+  let click, replaced;
+  const label = {};
+  const context = {
+    document: { getElementById: id => id === 'app-version' ? label : { addEventListener: (_, fn) => { click = fn; } } },
+    window: { location: { href: 'https://example.org/game/?refresh=old&x=1#clock', replace: url => { replaced = url; } } },
+    URL, Date
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(root, 'src/version.js'), 'utf8'), context);
+  assert.equal(label.textContent, 'v0.8.0');
+  assert.match(html, /src="src\/version.js"/);
+  click();
+  const url = new URL(replaced);
+  assert.equal(url.origin, 'https://example.org');
+  assert.equal(url.pathname, '/game/');
+  assert.equal(url.searchParams.get('x'), '1');
+  assert.notEqual(url.searchParams.get('refresh'), 'old');
+  assert.equal(url.searchParams.getAll('refresh').length, 1);
+  assert.equal(url.hash, '#clock');
+});

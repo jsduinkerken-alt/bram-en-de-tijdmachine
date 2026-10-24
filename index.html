@@ -38,6 +38,15 @@ nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .score{font-weight:800;color:#6a5d13;white-space:nowrap;font-size:1.1rem}
 .foot{font-size:.84rem;color:#697993;text-align:center;margin:0}
 .hidden{display:none}
+.time-digital{font-size:1.2em;font-weight:850}
+.time-written{font-size:.78em;font-weight:500;display:inline-block}
+.party{position:fixed;inset:0;z-index:10;pointer-events:none;overflow:hidden}
+.party[hidden]{display:none}
+.party button{position:absolute;top:16px;right:16px;pointer-events:auto}
+.balloon{position:absolute;bottom:-150px;left:var(--left);width:58px;height:74px;border-radius:50%;background:var(--color);animation:float-up 3.2s ease-out both;animation-delay:var(--delay)}
+.balloon::after{content:'';position:absolute;top:74px;left:28px;width:1px;height:65px;background:#687790}
+@keyframes float-up{to{transform:translateY(calc(-100vh - 180px)) rotate(12deg)}}
+@media(prefers-reduced-motion:reduce){.balloon{animation:none;bottom:35%}}
 .spark{animation:pop .36s ease-out}
 @keyframes pop{from{transform:scale(.96)}50%{transform:scale(1.025)}to{transform:scale(1)}}
 @media (min-width: 860px){
@@ -120,6 +129,7 @@ nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
   <p class="foot">Tip: je kunt nu beide wijzers soepel verplaatsen. De grote wijzer mag overal staan en de kleine wijzer beweegt direct mee — en andersom ook.</p>
 </main>
 
+<div id="party" class="party" hidden aria-label="Ballonnenfeest"><button id="skip-party" type="button">Feest overslaan ✕</button><div id="balloons" aria-hidden="true"></div></div>
 <script>
 const $ = id => document.getElementById(id);
 const names = ['twaalf','één','twee','drie','vier','vijf','zes','zeven','acht','negen','tien','elf'];
@@ -129,6 +139,7 @@ let goalHour=3, goalMinute=0, stars=0, done=false;
 let activeHand=null;
 const svg=$('clock');
 let audioCtx=null;
+let partyTimer=null, lastPartyThreshold=0, partySounds=[];
 
 for(let i=0;i<60;i++){
   const a=i*Math.PI/30;
@@ -156,15 +167,26 @@ for(let i=1;i<=12;i++){
 }
 
 function mod(n,m){ return ((n%m)+m)%m; }
-function currentHour(){ return Math.floor(totalMinutes/60)%12 || 12; }
-function currentMinute(){ return Math.round(mod(totalMinutes,60)); }
+function currentHour(){ return Math.floor(mod(Math.round(totalMinutes),720)/60) || 12; }
+function currentMinute(){ return mod(Math.round(totalMinutes),60); }
 function digitalText(h,m){ return `${h}:${String(m).padStart(2,'0')}`; }
 function phrase(h,m){
   if(m===0) return `${names[h%12]} uur`;
   if(m===30) return `half ${names[(h+1)%12]}`;
-  return digitalText(h,m);
+  if(m===15) return `kwart over ${names[h%12]}`;
+  if(m===45) return `kwart voor ${names[(h+1)%12]}`;
+  const number=n=>n<=12 ? names[n%12] : n<20 ? ['dertien','veertien','vijftien','zestien','zeventien','achttien','negentien'][n-13] : n===20 ? 'twintig' : `${names[n-20]}entwintig`;
+  return m<30 ? `${number(m)} over ${names[h%12]}` : `${number(60-m)} voor ${names[(h+1)%12]}`;
 }
-function displayTime(){ return phrase(currentHour(), currentMinute()); }
+function timeValue(h,m){ return mod(h*60+m,720); }
+function timeText(h,m){ return `${digitalText(h,m)} (${phrase(h,m)})`; }
+function renderTime(el,h,m,prefix='',suffix=''){
+  el.textContent='';
+  el.append(document.createTextNode(prefix));
+  const digital=document.createElement('span'); digital.className='time-digital'; digital.textContent=digitalText(h,m);
+  const written=document.createElement('span'); written.className='time-written'; written.textContent=` (${phrase(h,m)})`;
+  el.append(digital); el.append(written); el.append(document.createTextNode(suffix));
+}
 function moveLine(id,deg,len,y1){
   const a=deg*Math.PI/180;
   $(id).setAttribute('x1',200);
@@ -198,8 +220,9 @@ function randomTime(){
   return [h,m];
 }
 function setTime(h,m){ totalMinutes = mod((h%12)*60 + m, 720); draw(); }
-function updateDiscoverPrompt(){ $('prompt').textContent = `Het is ${displayTime()}!`; }
+function updateDiscoverPrompt(){ renderTime($('prompt'),currentHour(),currentMinute(),'Het is ','!'); }
 function setup(){
+  stopParty();
   done=false;
   $('feedback').textContent='';
   $('feedback').classList.remove('bad');
@@ -215,22 +238,22 @@ function setup(){
   } else if(mode==='set'){
     [goalHour,goalMinute]=randomTime();
     setTime(12,0);
-    $('prompt').textContent=`Maak: ${phrase(goalHour,goalMinute)}!`;
+    renderTime($('prompt'),goalHour,goalMinute,'Maak: ','!');
     $('hint').textContent='Je mag beide wijzers gebruiken. Ze reageren direct op elkaar.';
   } else {
     const [h,m]=randomTime();
     setTime(h,m);
     $('prompt').textContent='Hoe laat is het?';
     $('hint').textContent='Tik op het juiste antwoord.';
-    const correct=phrase(h,m);
+    const correct=timeValue(h,m);
     const choices=new Set([correct]);
     while(choices.size<3){
       const [rh,rm]=randomTime();
-      choices.add(phrase(rh,rm));
+      choices.add(timeValue(rh,rm));
     }
     Array.from(choices).sort(()=>Math.random()-.5).forEach(v=>{
       const b=document.createElement('button');
-      b.textContent=v;
+      renderTime(b,Math.floor(v/60)||12,v%60);
       b.onclick=()=>answer(v);
       $('answers').append(b);
     });
@@ -238,16 +261,18 @@ function setup(){
   selection();
   if(play==='solo') speakPrompt();
 }
-function playSuccessSound(){
+function playSuccessSound(party=false){
   try{
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if(audioCtx.state==='suspended') audioCtx.resume();
     const now=audioCtx.currentTime;
-    const notes=[523.25,659.25,783.99,1046.5];
+    const notes=party ? [523.25,659.25,783.99,659.25,783.99,1046.5,1046.5] : [523.25,659.25,783.99,1046.5];
     notes.forEach((freq,i)=>{
       const osc=audioCtx.createOscillator();
       const gain=audioCtx.createGain();
       osc.type='sine';
+      if(party) partySounds.push(osc);
+      osc.onended=()=>{ osc.disconnect(); gain.disconnect(); };
       osc.frequency.value=freq;
       gain.gain.setValueAtTime(0.0001,now+i*0.11);
       gain.gain.exponentialRampToValueAtTime(0.18,now+i*0.11+0.02);
@@ -258,6 +283,26 @@ function playSuccessSound(){
     });
   }catch(e){}
 }
+function stopParty(){
+  clearTimeout(partyTimer);
+  $('party').hidden=true;
+  $('balloons').textContent='';
+  partySounds.forEach(osc=>{ try{osc.stop();}catch(e){} });
+  partySounds=[];
+}
+function startParty(){
+  stopParty();
+  $('party').hidden=false;
+  const colors=['#ff6685','#ffbc28','#3f62dc','#24b99a'];
+  for(let i=0;i<12;i++){
+    const balloon=document.createElement('div'); balloon.className='balloon';
+    balloon.style.cssText=`--left:${4+i*8}%;--color:${colors[i%4]};--delay:${i%3*.12}s`;
+    $('balloons').append(balloon);
+  }
+  playSuccessSound(true);
+  partyTimer=setTimeout(stopParty,3800);
+}
+$('skip-party').onclick=stopParty;
 function celebrate(){
   if(done) return;
   done=true;
@@ -266,11 +311,14 @@ function celebrate(){
   $('feedback').classList.remove('bad');
   $('feedback').textContent=['🌟 Supergoed, Bram!','🎉 Hoera! Helemaal goed!','🚂 Goed gedaan!'][Math.floor(Math.random()*3)];
   $('panel').classList.remove('spark'); void $('panel').offsetWidth; $('panel').classList.add('spark');
-  playSuccessSound();
+  if(stars%10===0 && stars>lastPartyThreshold){
+    lastPartyThreshold=stars;
+    startParty();
+  } else playSuccessSound();
 }
 function answer(v){
   if(done) return;
-  if(v===phrase(currentHour(), currentMinute())) celebrate();
+  if(v===timeValue(currentHour(), currentMinute())) celebrate();
   else { $('feedback').textContent='Bijna! Probeer het nog eens 😊'; $('feedback').classList.add('bad'); }
 }
 function isCorrect(){
@@ -280,7 +328,7 @@ function isCorrect(){
   return diff<=4; // een beetje speelruimte
 }
 $('check').onclick=()=>{
-  if(done) return;
+  if(done || mode!=='set') return;
   if(isCorrect()) celebrate();
   else { $('feedback').textContent='Nog niet helemaal. Kijk goed naar de wijzers! 💛'; $('feedback').classList.add('bad'); }
 };
@@ -292,7 +340,8 @@ document.querySelectorAll('[data-level]').forEach(b=>b.onclick=()=>{ level=b.dat
 function speakPrompt(){
   if(!('speechSynthesis' in window)) { $('feedback').textContent='Deze browser kan helaas niet voorlezen.'; return; }
   speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance($('prompt').textContent);
+  const spoken=mode==='discover' ? `Het is ${phrase(currentHour(),currentMinute())}!` : mode==='set' ? `Maak: ${phrase(goalHour,goalMinute)}!` : 'Hoe laat is het?';
+  const u=new SpeechSynthesisUtterance(spoken);
   u.lang='nl-NL'; u.rate=.82; u.pitch=1.08;
   speechSynthesis.speak(u);
 }

@@ -5,8 +5,12 @@ Een klein Nederlandstalig klokleerspel voor iPad en computer.
 ## Starten
 Open `index.html` in een browser. De app heeft geen externe afhankelijkheden.
 
+## Ontwikkelen en testen
+
+Zie `PROJECT_OVERVIEW.md` voor structuur en scope en `Documentation/Testing/BRAM-SETUP-001.md` voor de overdracht aan Henk en Jasper. Voer `node --test` uit met Node.js 24; er zijn geen pakketten te installeren. De centrale appversie staat in `src/version.js`.
+
 ## Publiceren met GitHub Pages
-Maak een openbare GitHub-repository aan, upload `index.html` naar de root van de `main`-branch en kies Settings > Pages > Deploy from a branch > main / (root) > Save.
+Behoud `index.html`, `apple-touch-icon.png` en `src/` op hun huidige paden. Publiceer BRAM-SETUP-001 pas na expliciete acceptatie door Jasper. Een merge naar de bestaande Pages-bron kan de live site bijwerken; merge deze kandidaat dus nog niet. De werkende baseline blijft tot acceptatie beschikbaar.
 
 ## Privacy
 De app gebruikt geen analytische diensten of server. Spraak gebruikt de browserfunctie speechSynthesis indien beschikbaar.
